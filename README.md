@@ -110,4 +110,4 @@ R : Installe `ffmpeg` si ce n’est pas déjà fait (`sudo apt install ffmpeg` o
 
 ## 📜 Licence
 
-MIT © TonNom. Utilisation libre, modification encouragée.
+MIT © Sunvy. Utilisation libre, modification encouragée.
