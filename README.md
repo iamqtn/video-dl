@@ -1,36 +1,39 @@
 # 🎥 Téléchargeur Universel de Vidéos avec `yt-dlp`
 
-Ce script Python permet de **télécharger n'importe quelle vidéo** (ou seulement l’audio) depuis **YouTube, Twitter, TikTok, Instagram, Facebook, et bien d’autres**, grâce à l’outil `yt-dlp`.
+Ce script Python te permet de **télécharger n'importe quelle vidéo (ou seulement l’audio)** depuis **YouTube, Twitter, TikTok, Instagram, Facebook**, et bien d’autres plateformes supportées par [`yt-dlp`](https://github.com/yt-dlp/yt-dlp).
 
 ## ✨ Fonctionnalités
 
-- ✅ Téléchargement de vidéos ou seulement de l'audio
-- ✅ Compatible avec des centaines de sites
-- ✅ Conversion dans différents formats (`mp4`, `mkv`, `webm`, etc.)
-- ✅ Téléchargement de playlists complètes
+- ✅ Téléchargement de vidéos ou uniquement de l'audio
+- ✅ Compatible avec **des centaines de sites**
+- ✅ Conversion dans différents formats (`mp4`, `mkv`, `webm`, `mp3`, etc.)
+- ✅ Téléchargement de **playlists complètes**
 - ✅ Mise à jour automatique de `yt-dlp`
-- ✅ Interface CLI claire et personnalisable
-- ✅ Barre de progression avec `tqdm`
+- ✅ Interface CLI simple, colorée et ergonomique
+- ✅ Barre de progression dynamique avec `tqdm`
+- ✅ Messages colorés avec `colorama`
+- ✅ Vérification automatique de la validité de l’URL
 
 ## 📦 Installation
 
 1. Clone ce dépôt :
 
 ```bash
-git clone https://github.com/ton-utilisateur/video-downloader.git
-cd video-downloader
+git clone https://github.com/Luxkaiii/video-dl.git
+cd video-dl
 ```
 
-2. Installe les dépendances :
+2. (Recommandé) Crée un environnement virtuel :
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # ou .\venv\Scripts\activate sous Windows
+```
+
+3. Installe les dépendances :
 
 ```bash
 pip install -r requirements.txt
-```
-
-3. (Facultatif) Crée un fichier `.env` :
-
-```bash
-cp .env.example .env
 ```
 
 ## 🚀 Utilisation
@@ -41,37 +44,37 @@ cp .env.example .env
 python main.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 ```
 
-### Options
+### Options disponibles
 
-| Option        | Description                                                  |
-|---------------|--------------------------------------------------------------|
-| `--audio`     | Télécharge uniquement l’audio                                 |
-| `--format`    | Spécifie le format de sortie (`mp4`, `mkv`, `webm`, etc.)     |
-| `--output`    | Répertoire de destination (par défaut : `~/Downloads/`)       |
-| `--playlist`  | Télécharge une playlist complète                              |
-| `--update`    | Met à jour `yt-dlp` à la dernière version                     |
+| Option        | Description                                                    |
+|---------------|----------------------------------------------------------------|
+| `--audio`     | Télécharge uniquement l’audio                                  |
+| `--format`    | Spécifie le format de sortie (`mp4`, `mkv`, `mp3`, etc.)       |
+| `--output`    | Dossier de destination (défaut : `~/Downloads/`)               |
+| `--playlist`  | Télécharge toute la playlist si l’URL en contient une          |
+| `--update`    | Force la mise à jour de `yt-dlp`                               |
 
 ### Exemples
 
-- 🎵 Télécharger une vidéo en audio MP3 :
+- 🎵 Télécharger une vidéo YouTube en MP3 :
 
 ```bash
-python main.py "URL" --audio --format mp3
+python main.py "https://www.youtube.com/watch?v=..." --audio --format mp3
 ```
 
-- 📁 Changer le dossier de destination :
+- 📁 Spécifier un dossier personnalisé :
 
 ```bash
-python main.py "URL" --output "/chemin/vers/mon/dossier"
+python main.py "https://..." --output "/chemin/vers/mon/dossier"
 ```
 
-- 📺 Télécharger une playlist complète :
+- 📺 Télécharger une playlist entière :
 
 ```bash
-python main.py "URL-de-playlist" --playlist
+python main.py "https://www.youtube.com/playlist?list=..." --playlist
 ```
 
-- 🔄 Forcer la mise à jour de `yt-dlp` :
+- 🔄 Mettre à jour `yt-dlp` :
 
 ```bash
 python main.py --update
@@ -79,35 +82,42 @@ python main.py --update
 
 ## 🧪 Développement
 
-Si tu souhaites modifier ou améliorer ce script :
-
 - Le fichier principal est `main.py`
 - Toutes les dépendances sont listées dans `requirements.txt`
-- Tu peux ajouter des variables d’environnement via `.env`
+- Tu peux créer un fichier `.env` pour des variables personnalisées (facultatif)
 
-## 🧼 Astuce : créer un alias Bash
+## 🪤 Astuce : créer un alias Bash
 
-Ajoute cette ligne dans ton `~/.bashrc` ou `~/.zshrc` :
+Ajoute dans ton `~/.bashrc` ou `~/.zshrc` :
 
 ```bash
-alias dlvid="python /chemin/vers/video-downloader/main.py"
+alias dlvid="python /chemin/vers/video-dl/main.py"
+```
+
+Et utilise simplement :
+
+```bash
+dlvid "https://www.youtube.com/watch?v=..."
 ```
 
 ---
 
 ## ❓ FAQ
 
-**Q : Pourquoi utiliser `yt-dlp` plutôt que `youtube-dl` ?**  
-R : `yt-dlp` est un fork plus actif et maintenu, avec plus de fonctionnalités (meilleur support des plateformes modernes).
+**Q : Pourquoi `yt-dlp` au lieu de `youtube-dl` ?**  
+R : Parce qu’il est **plus rapide, plus maintenu, et compatible avec plus de sites**.
 
-**Q : Le téléchargement échoue avec certaines URL ?**  
-R : Assure-toi d’avoir bien la dernière version avec `--update`. Certains sites changent souvent leur structure.
+**Q : Le téléchargement échoue ?**  
+R : Lance avec `--update` pour t'assurer d'avoir la dernière version de `yt-dlp`.
 
-**Q : Le format de sortie n’est pas reconnu ?**  
-R : Installe `ffmpeg` si ce n’est pas déjà fait (`sudo apt install ffmpeg` ou `brew install ffmpeg`).
+**Q : Les formats ne marchent pas ?**  
+R : Vérifie que `ffmpeg` est bien installé (`brew install ffmpeg` ou `sudo apt install ffmpeg`).
+
+**Q : Comment contourner une vidéo géobloquée ?**  
+R : Tu peux ajouter l’option `--proxy` avec un proxy/VPN configuré (support en cours d’intégration).
 
 ---
 
 ## 📜 Licence
 
-MIT © Sunvy. Utilisation libre, modification encouragée.
+MIT © Luxkaiii. Utilisation libre.
