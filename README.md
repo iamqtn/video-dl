@@ -19,7 +19,7 @@ Ce script Python te permet de **télécharger n'importe quelle vidéo (ou seulem
 1. Clone ce dépôt :
 
 ```bash
-git clone https://github.com/Luxkaiii/video-dl.git
+git clone https://github.com/iamqtn/video-dl.git
 cd video-dl
 ```
 
