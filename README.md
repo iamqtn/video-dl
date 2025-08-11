@@ -120,4 +120,4 @@ R : Tu peux ajouter l’option `--proxy` avec un proxy/VPN configuré (support e
 
 ## 📜 Licence
 
-MIT © Luxkaiii. Utilisation libre.
+MIT © iamqtn. Utilisation libre.
