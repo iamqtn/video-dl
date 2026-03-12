@@ -1,112 +1,198 @@
 import yt_dlp
 import sys
-import validators
-import subprocess
 import re
 import os
+import json
 import argparse
-from requests.exceptions import RequestException
+import subprocess
+import urllib.request
 from tqdm import tqdm
-from colorama import Fore, Style, init
+from colorama import Fore, init
 
-init(autoreset=True)  # Active la coloration automatique
+init(autoreset=True)
 
-progress_bar = None  # Global pour suivre une seule barre
 
-def mettre_a_jour_ytdlp():
-    print(f"{Fore.YELLOW}🔄 Mise à jour de yt-dlp...")
-    subprocess.run(["pip3", "install", "--upgrade", "yt-dlp"], check=True)
-    print(f"{Fore.GREEN}✅ yt-dlp mis à jour avec succès !")
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
-def verifier_mise_a_jour_ytdlp():
+def strip_ansi(text: str) -> str:
+    return re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])').sub('', text)
+
+
+def validate_url(url: str) -> bool:
+    return url.startswith(("http://", "https://"))
+
+
+# ── yt-dlp update ──────────────────────────────────────────────────────────────
+
+def get_installed_version() -> str | None:
     try:
-        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
-        version_installee = result.stdout.strip()
+        result = subprocess.run(
+            [sys.executable, "-m", "yt_dlp", "--version"],
+            capture_output=True, text=True
+        )
+        return result.stdout.strip()
+    except Exception:
+        return None
 
-        result = subprocess.run(["pip", "index", "versions", "yt-dlp"], capture_output=True, text=True)
-        versions_disponibles = result.stdout
 
-        if version_installee not in versions_disponibles:
-            print(f"{Fore.CYAN}⚠️ Nouvelle version disponible : mise à jour en cours...")
-            mettre_a_jour_ytdlp()
-    except Exception as e:
-        print(f"{Fore.RED}❌ Erreur lors de la vérification de la mise à jour : {e}")
+def get_latest_version() -> str | None:
+    try:
+        with urllib.request.urlopen("https://pypi.org/pypi/yt-dlp/json", timeout=5) as r:
+            return json.load(r)["info"]["version"]
+    except Exception:
+        return None
 
-def verifier_url(url):
-    return validators.url(url)
 
-def remove_ansi_escape_sequences(text):
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    return ansi_escape.sub('', text)
+def update_ytdlp():
+    print(f"{Fore.YELLOW}🔄 Updating yt-dlp...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"], check=True)
+    print(f"{Fore.GREEN}✅ yt-dlp updated successfully.")
 
-def my_hook(d):
-    global progress_bar
 
-    if d['status'] == 'downloading':
-        percent_str = d.get('_percent_str', '0%')
-        percent_str_clean = remove_ansi_escape_sequences(percent_str)
-        try:
-            percent = float(percent_str_clean.strip('%'))
-        except ValueError:
-            percent = 0.0
+def check_for_update():
+    installed = get_installed_version()
+    latest = get_latest_version()
+    if installed and latest and installed != latest:
+        print(f"{Fore.CYAN}⚠️  New version available ({latest}), updating...")
+        update_ytdlp()
 
-        if progress_bar is None:
-            progress_bar = tqdm(total=100, bar_format=f"{Fore.GREEN}⬇️  |{{bar}}| {{percentage:.0f}}%", colour="green")
-        progress_bar.n = percent
-        progress_bar.refresh()
 
-    elif d['status'] == 'finished':
-        if progress_bar:
-            progress_bar.close()
-            print(f"\n{Fore.GREEN}✅ Téléchargement terminé, conversion en MP4 en cours...")
+# ── Progress hook ──────────────────────────────────────────────────────────────
 
-def telecharger_video(url, audio_only=False, format_video="mp4", output_dir="~/Downloads/", playlist=False):
+class ProgressHandler:
+    def __init__(self, audio_only: bool, fmt: str):
+        self.bar = None
+        self.audio_only = audio_only
+        self.fmt = fmt
+
+    def hook(self, d: dict):
+        if d["status"] == "downloading":
+            percent_str = strip_ansi(d.get("_percent_str", "0%")).strip().rstrip("%")
+            try:
+                percent = float(percent_str)
+            except ValueError:
+                percent = 0.0
+
+            if self.bar is None:
+                self.bar = tqdm(
+                    total=100,
+                    bar_format=f"{Fore.GREEN}⬇  |{{bar}}| {{percentage:.0f}}%",
+                    colour="green",
+                )
+            self.bar.n = percent
+            self.bar.refresh()
+
+        elif d["status"] == "finished":
+            if self.bar:
+                self.bar.n = 100
+                self.bar.refresh()
+                self.bar.close()
+                self.bar = None
+            if self.audio_only:
+                print(f"\n{Fore.GREEN}✅ Download complete, extracting audio...")
+            else:
+                print(f"\n{Fore.GREEN}✅ Download complete, merging to {self.fmt.upper()}...")
+
+        elif d["status"] == "error":
+            if self.bar:
+                self.bar.close()
+                self.bar = None
+            print(f"\n{Fore.RED}❌ An error occurred during download.")
+
+
+# ── Download ───────────────────────────────────────────────────────────────────
+
+def download(url: str, audio_only: bool, fmt: str, output_dir: str, playlist: bool):
     output_dir = os.path.expanduser(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
+    handler = ProgressHandler(audio_only=audio_only, fmt=fmt)
+
     ydl_opts = {
-        'format': 'bestaudio/best' if audio_only else 'bestvideo+bestaudio/best',
-        'outtmpl': f"{output_dir}/%(title)s.%(ext)s",
-        'merge_output_format': format_video,
-        'progress_hooks': [my_hook],
-        'noplaylist': not playlist,
-        'quiet': True,
+        "outtmpl": os.path.join(output_dir, "%(title)s.%(ext)s"),
+        "progress_hooks": [handler.hook],
+        "noplaylist": not playlist,
+        "ignoreerrors": playlist,   # skip unavailable videos in playlists
+        "quiet": True,
+        "no_warnings": True,
+        # Always try to get the best quality available
+        "format": "bestaudio/best" if audio_only else "bestvideo+bestaudio/best",
+        "merge_output_format": fmt if not audio_only else None,
+        # Audio extraction
+        "postprocessors": (
+            [{"key": "FFmpegExtractAudio", "preferredcodec": fmt if fmt in ("mp3", "aac", "opus", "flac", "wav", "m4a") else "mp3"}]
+            if audio_only else []
+        ),
+        # Broad compatibility: retry on transient errors
+        "retries": 5,
+        "fragment_retries": 5,
+        # Some sites require cookies / age gate bypass
+        "age_limit": None,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+    except yt_dlp.utils.DownloadError as e:
+        print(f"{Fore.RED}❌ Download error: {e}")
+        sys.exit(1)
     except Exception as e:
-        print(f"{Fore.RED}❌ Erreur lors du téléchargement : {e}")
+        print(f"{Fore.RED}❌ Unexpected error: {e}")
+        sys.exit(1)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="🎥 Téléchargeur de vidéos avancé avec yt-dlp")
 
-    parser.add_argument("url", help="URL de la vidéo à télécharger")
-    parser.add_argument("--audio", action="store_true", help="Télécharger uniquement l'audio")
-    parser.add_argument("--format", default="mp4", help="Format de sortie (mp4, mkv, webm...)")
-    parser.add_argument("--output", default="~/Downloads/", help="Dossier de destination")
-    parser.add_argument("--playlist", action="store_true", help="Télécharger une playlist complète")
-    parser.add_argument("--update", action="store_true", help="Mettre à jour yt-dlp")
+# ── Entry point ────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Download any video from any website using yt-dlp.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python video_dl.py https://youtube.com/watch?v=xxx
+  python video_dl.py https://youtube.com/watch?v=xxx --audio --format mp3
+  python video_dl.py https://youtube.com/playlist?list=xxx --playlist
+  python video_dl.py https://twitter.com/x/status/xxx --output ~/Videos/
+  python video_dl.py --update
+        """
+    )
+
+    parser.add_argument("url", nargs="?", help="URL of the video to download")
+    parser.add_argument("--audio",    action="store_true",   help="Extract audio only")
+    parser.add_argument("--format",   default="mp4",         help="Output format: mp4, mkv, webm, mp3, m4a… (default: mp4)")
+    parser.add_argument("--output",   default="~/Downloads/",help="Output directory (default: ~/Downloads/)")
+    parser.add_argument("--playlist", action="store_true",   help="Download full playlist")
+    parser.add_argument("--update",   action="store_true",   help="Update yt-dlp to latest version")
 
     args = parser.parse_args()
 
-    if not verifier_url(args.url):
-        print(f"{Fore.RED}❌ L'URL fournie n'est pas valide.")
+    # --update doesn't need a URL
+    if args.update:
+        update_ytdlp()
+        sys.exit(0)
+
+    if not args.url:
+        parser.print_help()
         sys.exit(1)
 
-    if args.update:
-        mettre_a_jour_ytdlp()
-        sys.exit(0)
-    else:
-        verifier_mise_a_jour_ytdlp()
+    if not validate_url(args.url):
+        print(f"{Fore.RED}❌ Invalid URL: {args.url}")
+        sys.exit(1)
 
-    telecharger_video(
+    # Auto-check for yt-dlp update before downloading
+    check_for_update()
+
+    print(f"{Fore.CYAN}🎬 Starting download: {args.url}")
+    download(
         url=args.url,
         audio_only=args.audio,
-        format_video=args.format,
+        fmt=args.format,
         output_dir=args.output,
-        playlist=args.playlist
+        playlist=args.playlist,
     )
 
-    print(f"{Fore.CYAN}🎉 Fichier disponible dans : {os.path.expanduser(args.output)}")
+    print(f"{Fore.CYAN}📁 File saved to: {os.path.expanduser(args.output)}")
+
+
+if __name__ == "__main__":
+    main()
